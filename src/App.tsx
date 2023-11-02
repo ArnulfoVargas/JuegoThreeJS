@@ -13,6 +13,7 @@ function doThreeJS(){
   const physWorld = new CANNON.World()
 
   physWorld.gravity = new CANNON.Vec3(0, -9.81, 0)
+  scene.fog = new THREE.Fog( 0xcccccc, 20, 15 );
 
   //Luz ambiental
   const ambientLight = new THREE.AmbientLight(0xe0e0e0,1);
@@ -24,11 +25,14 @@ function doThreeJS(){
   scene.add(light);
   
   //Elementos del juego
+  let points : number = 0;
+
   class Player {
     playerBody : THREE.Group<THREE.Object3DEventMap> | any;
     playerPhys : CANNON.Body;
     isLoaded : boolean = false;
     isAlive : boolean = true;
+    id : number;
 
     constructor() {
       gltfLoader.load("/models/bird.gltf", (bird) => {
@@ -46,10 +50,12 @@ function doThreeJS(){
       })
 
       physWorld.addBody(this.playerPhys)
+      this.id = this.playerPhys.id;
     }
 
     onClick = () => {
-      this.playerPhys.velocity.set(0, 5, 0);
+      if(this.isAlive)
+        this.playerPhys.velocity.set(0, 6, 0);
     }
 
     updatePosition = () => {
@@ -62,6 +68,11 @@ function doThreeJS(){
       const physTopPosition = new THREE.Vector3(this.playerPhys.position.x, this.playerPhys.position.y, this.playerPhys.position.z)
       this.playerBody.position.copy(physTopPosition)
     }
+
+    onCollide = () => {
+      this.isAlive = false;
+      this.playerPhys.type = CANNON.Body.STATIC;
+    }
   }
 
 
@@ -71,6 +82,7 @@ function doThreeJS(){
     lowPipe : THREE.Group<THREE.Object3DEventMap> | any;
     lowPipePhys : CANNON.Body;
     topPipePhys : CANNON.Body;
+    addPointsPhys : CANNON.Body;
     loadIndex : number = 0;
     loaded : boolean = false;
 
@@ -81,8 +93,7 @@ function doThreeJS(){
       // Low Pipe
       gltfLoader.load("/models/pipe.gltf", (pipe) => {
         const pipeLoaded = pipe.scene;
-        //half 8.5
-        // pos x = 30 miny = -17 maxy = -5
+        pipeLoaded.position.set(0, 0, 100)
         this.lowPipe = pipeLoaded;
         scene.add(pipeLoaded);
         this.loadIndex += 1;
@@ -90,6 +101,7 @@ function doThreeJS(){
         this.loaded = this.loadIndex >= 2;
       })
 
+      //Low pipe phys
       this.lowPipePhys= new CANNON.Body({
         shape: new CANNON.Box(new CANNON.Vec3(1, 8.5 ,1)),
         type: CANNON.Body.KINEMATIC,
@@ -98,11 +110,18 @@ function doThreeJS(){
       this.lowPipePhys.position.set(0, -17 + randomHeight, 30)
       this.lowPipePhys.velocity.set(0, 0, -2)
 
+      physWorld.addBody(this.lowPipePhys)
+
+      this.lowPipePhys.addEventListener("collide", (event : any) => {
+        if(player.id === event.body.id){
+          onCollide()
+        }
+      })
+
       //High pipe
       gltfLoader.load("/models/pipeInverted.gltf", (pipe) => {
         const pipeLoaded = pipe.scene;
-        //half 8.5
-        // pos x = 30 miny = 5 maxy = 17
+        pipeLoaded.position.set(0, 0, 100)
         this.topPipe = pipeLoaded;
         scene.add(pipeLoaded)
         this.loadIndex += 1;
@@ -110,6 +129,7 @@ function doThreeJS(){
         this.loaded = this.loadIndex >= 2;
       })
 
+      //High pipe phys
       this.topPipePhys= new CANNON.Body({
         shape: new CANNON.Box(new CANNON.Vec3(1, 8.5 ,1)),
         type: CANNON.Body.KINEMATIC,
@@ -119,7 +139,30 @@ function doThreeJS(){
       this.topPipePhys.velocity.set(0, 0, -2)
 
       physWorld.addBody(this.topPipePhys)
-      physWorld.addBody(this.lowPipePhys)
+
+      this.topPipePhys.addEventListener("collide", (event : any) => {
+        if(player.id === event.body.id){
+          onCollide()
+        }
+      })
+
+      // AddPoints collider
+      this.addPointsPhys = new CANNON.Body({
+        type: CANNON.Body.KINEMATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(.1, 2.5, .1)),
+        mass: 0,
+      })
+      this.addPointsPhys.position.set(0, -6 + randomHeight, 30)
+      this.addPointsPhys.velocity.set(0, 0, -2)
+      this.addPointsPhys.collisionResponse = false;
+
+      physWorld.addBody(this.addPointsPhys)
+
+      this.addPointsPhys.addEventListener("collide", (event : any) => {
+        if(player.id === event.body.id){
+          points += 1;
+        }
+      })
     }
 
     updatePosition = () => {
@@ -135,15 +178,23 @@ function doThreeJS(){
     updateSpeed = (speed : number) => {
       this.lowPipePhys.velocity.set(0, 0, -speed)
       this.topPipePhys.velocity.set(0, 0, -speed)
+      this.addPointsPhys.velocity.set(0, 0, -speed)
     }
 
     stopMovement = () => {
       this.lowPipePhys.velocity.set(0, 0, 0)
       this.topPipePhys.velocity.set(0, 0, 0)
+      this.addPointsPhys.velocity.set(0, 0, 0)
+    }
+
+    resetPipe = () => {
+      const randomHeight = Math.floor(Math.random() * 13)
+      this.topPipePhys.position.set(0, 5 + randomHeight, 30)
+      this.lowPipePhys.position.set(0, -17 + randomHeight, 30)
+      this.addPointsPhys.position.set(0, -6 + randomHeight, 30)
     }
   }
 
-  const pipe = new Pipes()
   const player = new Player()
 
   //Fonditos
@@ -165,25 +216,87 @@ function doThreeJS(){
   camera.position.set(-20, 0, 7.5)
   camera.rotation.set(0, -1.5708 ,0)
 
+  //Creacion de pipes
+  const pipes : Array<Pipes>= []
+  let createdPipes : number = 0;
+  const maxPipes : number = 6;
+  const timePerSpawn : number = 3000;
+  let pipeIndex : number = 0;
+
+  let currentInterval = setInterval(()=>{
+
+    pipes.push(new Pipes())
+    createdPipes += 1;
+    if(createdPipes >= maxPipes){
+      clearInterval(currentInterval)
+      
+      currentInterval = setInterval(() => {
+
+        pipes[pipeIndex].resetPipe();
+        pipeIndex++;
+        pipeIndex %= pipes.length;
+      }, timePerSpawn)
+    }
+  }, timePerSpawn)
+
+  //Creacion de bordes
+
+  function createBorder(x:number, y:number, z:number){
+    const borderPhys= new CANNON.Body({
+      shape: new CANNON.Box(new CANNON.Vec3(3, .5 ,40)),
+      type: CANNON.Body.STATIC,
+      mass: 0,
+    })
+    borderPhys.position.set(x, y, z);
+    physWorld.addBody(borderPhys)
+
+    const borderGeo = new THREE.BoxGeometry(6,1,80)
+    const borderMat = new THREE.MeshPhongMaterial({color: 'green'})
+    const borderObj = new THREE.Mesh(borderGeo, borderMat);
+    scene.add(borderObj);
+    borderObj.position.copy(new THREE.Vector3(
+      borderPhys.position.x,
+      borderPhys.position.y,
+      borderPhys.position.z
+    ))
+
+    borderPhys.addEventListener("collide", (event : any) => {
+      if(player.id === event.body.id){
+        onCollide()
+      }
+    })
+  }
+
+  createBorder(0, -10, 10);
+  createBorder(0, 10, 10);
+
   //Logica del gameplay
   window.addEventListener("click", () => {
     player.onClick()
   })
 
-  const physStep = 1 / 30;
+  function onCollide() {
+    player.onCollide()
+    clearInterval(currentInterval)
+
+    for (const pipe of pipes)
+      pipe.stopMovement()
+  }
+
+  const physStep = 1 / 60;
   function animate() {
+
+    for(const pipe of pipes)
+      pipe.updatePosition()
 
     physWorld.step(physStep)
 
-    pipe.updatePosition()
     player.updatePosition()
 
     requestAnimationFrame( animate );
 
-
     renderer.render( scene, camera );
   }
-
 
   window.addEventListener( 'resize', onWindowResize, false );
   
@@ -202,7 +315,6 @@ const App = () => {
 
   return (
     <>
-      <div id="info">Buenas</div>
       {doThreeJS()}
     </>
   )

@@ -55,11 +55,18 @@ button:focus-visible {
 
 
 #info {
-  color: #213547;
+  color: white;
 	position: absolute;
 	top: 10px;
 	width: 100%;
 	text-align: center;
 	z-index: 1; /*0 tambien jalaria*/
 	display:block;
+  font-size: 2rem;
+  text-shadow: 2px 0px black,
+              -2px 0px black,
+               0px 2px black,
+               0px -2px black;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  user-select: none;
 }
