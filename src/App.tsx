@@ -25,7 +25,7 @@ function doThreeJS(){
   
   //Elementos del juego
   class Player {
-    playerBody : THREE.Group<THREE.Object3DEventMap>;
+    playerBody : THREE.Group<THREE.Object3DEventMap> | any;
     playerPhys : CANNON.Body;
     isLoaded : boolean = false;
     isAlive : boolean = true;
@@ -67,8 +67,8 @@ function doThreeJS(){
 
   class Pipes {
     
-    topPipe : THREE.Group<THREE.Object3DEventMap>;
-    lowPipe : THREE.Group<THREE.Object3DEventMap>;
+    topPipe : THREE.Group<THREE.Object3DEventMap> | any;
+    lowPipe : THREE.Group<THREE.Object3DEventMap> | any;
     lowPipePhys : CANNON.Body;
     topPipePhys : CANNON.Body;
     loadIndex : number = 0;
