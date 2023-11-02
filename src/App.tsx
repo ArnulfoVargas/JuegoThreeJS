@@ -161,6 +161,7 @@ function doThreeJS(){
       this.addPointsPhys.addEventListener("collide", (event : any) => {
         if(player.id === event.body.id){
           points += 1;
+          console.log(points)
         }
       })
     }
