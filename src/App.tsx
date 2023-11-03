@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import * as CANNON from 'cannon';
-import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 function doThreeJS(){
  
@@ -17,7 +17,7 @@ function doThreeJS(){
   const clock = new THREE.Clock();
 
   physWorld.gravity = new CANNON.Vec3(0, -9.81, 0);
-  scene.fog = new THREE.Fog( 0xcccccc, 20, 15 );
+  scene.fog = new THREE.Fog( 0xcccccc, 16, 15 );
 
   //Luz ambiental
   const ambientLight = new THREE.AmbientLight(0xe0e0e0,1);
@@ -49,7 +49,7 @@ function doThreeJS(){
       })
 
       this.playerPhys = new CANNON.Body({
-        shape: new CANNON.Sphere(.75),
+        shape: new CANNON.Sphere(.65),
         type: CANNON.Body.DYNAMIC,
         mass: 1
       })
@@ -194,6 +194,52 @@ function doThreeJS(){
     }
   }
 
+  class TreeModel {
+    loadedTree : THREE.Group<THREE.Object3DEventMap> | any;
+    treePhys : CANNON.Body;
+    speed : number = -3;
+    isLoaded : boolean = false;
+
+    constructor(){
+      gltfLoader.load("/models/tree.gltf", (model) => {
+        const modelLoaded = model.scene;
+        modelLoaded.position.set(0, 100, 0)
+        modelLoaded.rotation.set(0, Math.random(), 0)
+        modelLoaded.scale.set(.2,.2,.2)
+        this.loadedTree = modelLoaded;
+
+        this.isLoaded = true;
+        scene.add(modelLoaded)
+      })
+
+      this.treePhys= new CANNON.Body({
+        shape: new CANNON.Box(new CANNON.Vec3(1, 1 ,1)),
+        type: CANNON.Body.KINEMATIC,
+        mass: 0,
+      })
+      this.treePhys.position.set(10, -15 - (Math.random() * 5), 60)
+      this.treePhys.velocity.set(0, 0, this.speed)
+
+      physWorld.addBody(this.treePhys)
+    }
+
+    updatePosition = () => {
+
+      if (!this.isLoaded) return;
+
+      const physTopPosition = new THREE.Vector3(this.treePhys.position.x, this.treePhys.position.y, this.treePhys.position.z)
+      this.loadedTree.position.copy(physTopPosition)
+    }
+
+    stopMovement = () => {
+      this.treePhys.velocity.set(0, 0, 0)
+    }
+
+    resetTree = () => {
+      this.treePhys.position.set(10, -15 - (Math.random() * 5), 30)
+    }
+  }
+
   const player = new Player()
 
   // Preparacion de la UI
@@ -309,6 +355,35 @@ function doThreeJS(){
     }
   }
 
+   //Creacion de arboles
+   const trees : Array<TreeModel>= []
+   let createdTrees : number = 0;
+   const maxTrees : number = 8;
+   const timePerTreeSpawn : number = 10;
+   let treeIndex : number = 0;
+   let currentTreeTime : number = 9;
+ 
+   const createTree = (time : number) => {
+     if(!player.isAlive) return;
+ 
+     currentTreeTime += time;
+     if(currentTreeTime >= timePerTreeSpawn) 
+     currentTreeTime = 0;
+ 
+     if(currentTreeTime === 0){
+       if(createdTrees >= maxTrees){
+         trees[treeIndex].resetTree();
+         treeIndex++;
+         treeIndex %= trees.length;
+       }
+       else{
+         trees.push(new TreeModel())
+         createdTrees += 1;
+       }
+     }
+   }
+ 
+
   //Creacion de bordes
   function createBorder(x:number, y:number, z:number){
     const borderPhys= new CANNON.Body({
@@ -363,6 +438,9 @@ function doThreeJS(){
 
     for (const pipe of pipes)
       pipe.stopMovement()
+
+    for (const tree of trees)
+      tree.stopMovement()
   }
 
   function onScore(){
@@ -373,14 +451,19 @@ function doThreeJS(){
 
   const physStep = 1 / 60;
   function animate() {
+    const delta = clock.getDelta()
 
     for(const pipe of pipes)
       pipe.updatePosition()
 
+    for(const tree of trees)
+      tree.updatePosition()
+
     physWorld.step(physStep)
     player.updatePosition()
 
-    createPipe(clock.getDelta())
+    createPipe(delta)
+    createTree(delta)
 
     if(isMusicLoaded){
       if(!backgroundMusic.isPlaying)
@@ -390,7 +473,6 @@ function doThreeJS(){
     }
 
     requestAnimationFrame( animate );
-
     renderer.render( scene, camera );
   }
 
