@@ -70,3 +70,65 @@ button:focus-visible {
   font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
   user-select: none;
 }
+
+.score{
+  color: white;
+	position: absolute;
+  height: 100%;
+  width: 100%;
+  display:block;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  font-size: 3rem;
+  text-align: center;
+  text-shadow: -2px 0 black, 0 -2px black,
+                2px 0 black, 0 2px black;
+  user-select: none;
+}
+
+.game-over{
+  position: absolute;
+  height: 370px;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-over-text{
+  text-align: center;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  font-size: 3.5rem;
+}
+
+.data-text{
+  text-align: center;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  font-size: 2rem;
+  margin: .5rem;
+}
+
+.retry-button{
+  margin-top: 20px;
+  font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+  font-size: 2rem;
+  padding: .5rem;
+  width: 200px;
+  color: white;
+  background-color: #1f1f1f;
+  border: white solid 1px;
+  align-self: center;
+
+  transition: all .5s;
+}
+
+.retry-button:hover{
+  color: #1a1a1a;
+  background-color: white;
+  transition: all .5s;
+}
+
+.hide {
+  display: none;
+}

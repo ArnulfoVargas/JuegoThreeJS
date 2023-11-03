@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import * as CANNON from 'cannon';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 function doThreeJS(){
  
@@ -25,6 +26,7 @@ function doThreeJS(){
   scene.add(light);
   
   //Elementos del juego
+  let maxPoints : number = localStorage.getItem("maxPoints") ? +localStorage.getItem("maxPoints")! : 0;
   let points : number = 0;
 
   class Player {
@@ -160,8 +162,7 @@ function doThreeJS(){
 
       this.addPointsPhys.addEventListener("collide", (event : any) => {
         if(player.id === event.body.id){
-          points += 1;
-          console.log(points)
+          onScore()
         }
       })
     }
@@ -197,6 +198,47 @@ function doThreeJS(){
   }
 
   const player = new Player()
+
+  // Preparacion de la UI
+  const htmlRenderer = new CSS2DRenderer();
+  htmlRenderer.setSize(window.innerWidth, window.innerHeight);
+  htmlRenderer.domElement.style.position = 'absolute';
+  htmlRenderer.domElement.style.top = '0px';
+  document.body.appendChild(htmlRenderer.domElement); 
+  htmlRenderer.domElement.style.pointerEvents = 'none'; 
+  htmlRenderer.domElement.style.color = "#ffffff";
+
+  //Score UI
+  const scoreTitle = document.createElement('h1');
+  scoreTitle.innerText = points.toString();
+  scoreTitle.className = "score"
+  htmlRenderer.domElement.appendChild(scoreTitle)
+
+  //Game over ui
+  const gameOverUi = document.createElement('div');
+  gameOverUi.className = "hide"
+  htmlRenderer.domElement.appendChild(gameOverUi)
+
+  const gameOverUiText = document.createElement('h1')
+  gameOverUiText.className = "game-over-text"
+  gameOverUiText.textContent = "GAME OVER"
+  gameOverUi.appendChild(gameOverUiText)
+
+  const scoreGameOverText = document.createElement('h1')
+  scoreGameOverText.className = "data-text"
+  scoreGameOverText.textContent = "Score: "
+  gameOverUi.appendChild(scoreGameOverText)
+
+  const highScoreGameOverText = document.createElement('h1')
+  highScoreGameOverText.className = "data-text"
+  highScoreGameOverText.textContent = "High Score: "
+  gameOverUi.appendChild(highScoreGameOverText)
+
+  const retryButton = document.createElement('button')
+  retryButton.className = "retry-button"
+  retryButton.innerText = "Retry"
+  retryButton.onclick = () => location.reload()
+  gameOverUi.appendChild(retryButton)
 
   //Fonditos
   textureLoader.load("/background/fondito.jpg", (bg) => {
@@ -241,7 +283,6 @@ function doThreeJS(){
   }, timePerSpawn)
 
   //Creacion de bordes
-
   function createBorder(x:number, y:number, z:number){
     const borderPhys= new CANNON.Body({
       shape: new CANNON.Box(new CANNON.Vec3(3, .5 ,40)),
@@ -277,11 +318,29 @@ function doThreeJS(){
   })
 
   function onCollide() {
+    //TODO Y FEEDBACK
+
+    if(points > maxPoints) {
+      maxPoints = points;
+      localStorage.setItem("maxPoints", maxPoints.toString())
+    }
+    scoreTitle.className = "hide"
+    htmlRenderer.domElement.style.pointerEvents = 'all'; 
+    gameOverUi.className = "game-over"
+    scoreGameOverText.innerText = `Score: ${points}`
+    highScoreGameOverText.innerText = `High Score: ${maxPoints}`
+
     player.onCollide()
     clearInterval(currentInterval)
 
     for (const pipe of pipes)
       pipe.stopMovement()
+  }
+
+  function onScore(){
+    //TODO feedback
+    points += 1;
+    scoreTitle.textContent = points.toString()
   }
 
   const physStep = 1 / 60;
@@ -306,6 +365,7 @@ function doThreeJS(){
     camera.updateProjectionMatrix();
 
     renderer.setSize( window.innerWidth, window.innerHeight );
+    htmlRenderer.setSize(window.innerWidth, window.innerHeight);
   }
   
   animate(); //Iniciamos el loop
