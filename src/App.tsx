@@ -10,10 +10,13 @@ function doThreeJS(){
   const camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.1, 1000 );
   const gltfLoader = new GLTFLoader();
   const rgbeLoader = new RGBELoader();
-  const textureLoader = new THREE.TextureLoader;
-  const physWorld = new CANNON.World()
+  const textureLoader = new THREE.TextureLoader();
+  const physWorld = new CANNON.World();
+  const audioListener = new THREE.AudioListener();
+  const audioLoader = new THREE.AudioLoader();
+  const clock = new THREE.Clock();
 
-  physWorld.gravity = new CANNON.Vec3(0, -9.81, 0)
+  physWorld.gravity = new CANNON.Vec3(0, -9.81, 0);
   scene.fog = new THREE.Fog( 0xcccccc, 20, 15 );
 
   //Luz ambiental
@@ -46,7 +49,7 @@ function doThreeJS(){
       })
 
       this.playerPhys = new CANNON.Body({
-        shape: new CANNON.Sphere(.5),
+        shape: new CANNON.Sphere(.75),
         type: CANNON.Body.DYNAMIC,
         mass: 1
       })
@@ -77,7 +80,6 @@ function doThreeJS(){
     }
   }
 
-
   class Pipes {
     
     topPipe : THREE.Group<THREE.Object3DEventMap> | any;
@@ -87,6 +89,7 @@ function doThreeJS(){
     addPointsPhys : CANNON.Body;
     loadIndex : number = 0;
     loaded : boolean = false;
+    speed: number = -4;
 
     constructor() {
 
@@ -110,7 +113,7 @@ function doThreeJS(){
         mass: 0,
       })
       this.lowPipePhys.position.set(0, -17 + randomHeight, 30)
-      this.lowPipePhys.velocity.set(0, 0, -2)
+      this.lowPipePhys.velocity.set(0, 0, this.speed)
 
       physWorld.addBody(this.lowPipePhys)
 
@@ -138,7 +141,7 @@ function doThreeJS(){
         mass: 0,
       })
       this.topPipePhys.position.set(0, 5 + randomHeight, 30)
-      this.topPipePhys.velocity.set(0, 0, -2)
+      this.topPipePhys.velocity.set(0, 0, this.speed)
 
       physWorld.addBody(this.topPipePhys)
 
@@ -155,7 +158,7 @@ function doThreeJS(){
         mass: 0,
       })
       this.addPointsPhys.position.set(0, -6 + randomHeight, 30)
-      this.addPointsPhys.velocity.set(0, 0, -2)
+      this.addPointsPhys.velocity.set(0, 0, this.speed)
       this.addPointsPhys.collisionResponse = false;
 
       physWorld.addBody(this.addPointsPhys)
@@ -175,12 +178,6 @@ function doThreeJS(){
       const physlowPosition = new THREE.Vector3(this.lowPipePhys.position.x, this.lowPipePhys.position.y, this.lowPipePhys.position.z)
       this.topPipe.position.copy(physTopPosition)
       this.lowPipe.position.copy(physlowPosition)
-    }
-
-    updateSpeed = (speed : number) => {
-      this.lowPipePhys.velocity.set(0, 0, -speed)
-      this.topPipePhys.velocity.set(0, 0, -speed)
-      this.addPointsPhys.velocity.set(0, 0, -speed)
     }
 
     stopMovement = () => {
@@ -240,6 +237,31 @@ function doThreeJS(){
   retryButton.onclick = () => location.reload()
   gameOverUi.appendChild(retryButton)
 
+  //Sonidos
+  const hitSound = new THREE.Audio(audioListener);
+  audioLoader.load("/sounds/pononoin.wav", (buffer) => {
+    hitSound.setBuffer(buffer);
+    hitSound.setLoop(false);
+    hitSound.setVolume(.5);
+  })
+
+  let isMusicLoaded : boolean = false;
+  const backgroundMusic = new THREE.Audio(audioListener);
+  audioLoader.load("/sounds/toad_background.wav", (buffer) => {
+    backgroundMusic.setBuffer(buffer);
+    backgroundMusic.setLoop(false);
+    backgroundMusic.setVolume(.05);
+
+    isMusicLoaded = true;
+  })
+
+  const coinSound = new THREE.Audio(audioListener);
+  audioLoader.load("/sounds/sound-effect-coin.wav", (buffer) => {
+    coinSound.setBuffer(buffer);
+    coinSound.setLoop(false);
+    coinSound.setVolume(.5);
+  })
+
   //Fonditos
   textureLoader.load("/background/fondito.jpg", (bg) => {
     bg.mapping = THREE.EquirectangularRefractionMapping;
@@ -262,25 +284,30 @@ function doThreeJS(){
   //Creacion de pipes
   const pipes : Array<Pipes>= []
   let createdPipes : number = 0;
-  const maxPipes : number = 6;
-  const timePerSpawn : number = 3000;
+  const maxPipes : number = 8;
+  const timePerSpawn : number = 2;
   let pipeIndex : number = 0;
+  let currentTime : number = 0.1;
 
-  let currentInterval = setInterval(()=>{
+  const createPipe = (time : number) => {
+    if(!player.isAlive) return;
 
-    pipes.push(new Pipes())
-    createdPipes += 1;
-    if(createdPipes >= maxPipes){
-      clearInterval(currentInterval)
-      
-      currentInterval = setInterval(() => {
+    currentTime += time;
+    if(currentTime >= timePerSpawn) 
+      currentTime = 0;
 
+    if(currentTime === 0){
+      if(createdPipes >= maxPipes){
         pipes[pipeIndex].resetPipe();
         pipeIndex++;
         pipeIndex %= pipes.length;
-      }, timePerSpawn)
+      }
+      else{
+        pipes.push(new Pipes())
+        createdPipes += 1;
+      }
     }
-  }, timePerSpawn)
+  }
 
   //Creacion de bordes
   function createBorder(x:number, y:number, z:number){
@@ -318,7 +345,6 @@ function doThreeJS(){
   })
 
   function onCollide() {
-    //TODO Y FEEDBACK
 
     if(points > maxPoints) {
       maxPoints = points;
@@ -329,16 +355,18 @@ function doThreeJS(){
     gameOverUi.className = "game-over"
     scoreGameOverText.innerText = `Score: ${points}`
     highScoreGameOverText.innerText = `High Score: ${maxPoints}`
+    backgroundMusic.setVolume(.01);
+
+    hitSound.play()
 
     player.onCollide()
-    clearInterval(currentInterval)
 
     for (const pipe of pipes)
       pipe.stopMovement()
   }
 
   function onScore(){
-    //TODO feedback
+    coinSound.play()
     points += 1;
     scoreTitle.textContent = points.toString()
   }
@@ -350,8 +378,16 @@ function doThreeJS(){
       pipe.updatePosition()
 
     physWorld.step(physStep)
-
     player.updatePosition()
+
+    createPipe(clock.getDelta())
+
+    if(isMusicLoaded){
+      if(!backgroundMusic.isPlaying)
+        {
+          backgroundMusic.play();
+        }
+    }
 
     requestAnimationFrame( animate );
 
@@ -382,4 +418,3 @@ const App = () => {
 }
 
 export default App
-
